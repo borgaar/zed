@@ -103,6 +103,10 @@ impl AnyProtoClient {
         let envelope = request.into_envelope(0, None, None);
         self.0.send(envelope)
     }
+
+    pub fn send_dynamic(&self, message: Envelope) -> anyhow::Result<()> {
+        self.0.send(message)
+    }
 }
 
 impl<T: EnvelopedMessage> AnyTypedEnvelope for TypedEnvelope<T> {
@@ -199,12 +203,9 @@ messages!(
     (CancelCall, Foreground),
     (ChannelMessageSent, Foreground),
     (ChannelMessageUpdate, Foreground),
-    (CompleteWithLanguageModel, Background),
     (ComputeEmbeddings, Background),
     (ComputeEmbeddingsResponse, Background),
     (CopyProjectEntry, Foreground),
-    (CountTokensWithLanguageModel, Background),
-    (CountTokensResponse, Background),
     (CreateBufferForPeer, Foreground),
     (CreateChannel, Foreground),
     (CreateChannelResponse, Foreground),
@@ -274,7 +275,6 @@ messages!(
     (JoinProjectResponse, Foreground),
     (JoinRoom, Foreground),
     (JoinRoomResponse, Foreground),
-    (LanguageModelResponse, Background),
     (LeaveChannelBuffer, Background),
     (LeaveChannelChat, Foreground),
     (LeaveProject, Foreground),
@@ -294,6 +294,12 @@ messages!(
     (PrepareRename, Background),
     (PrepareRenameResponse, Background),
     (ProjectEntryResponse, Foreground),
+    (CompleteWithLanguageModel, Background),
+    (CompleteWithLanguageModelResponse, Background),
+    (StreamCompleteWithLanguageModel, Background),
+    (StreamCompleteWithLanguageModelResponse, Background),
+    (CountLanguageModelTokens, Background),
+    (CountLanguageModelTokensResponse, Background),
     (RefreshInlayHints, Foreground),
     (RejoinChannelBuffers, Foreground),
     (RejoinChannelBuffersResponse, Foreground),
@@ -353,6 +359,7 @@ messages!(
     (UpdateParticipantLocation, Foreground),
     (UpdateProject, Foreground),
     (UpdateProjectCollaborator, Foreground),
+    (UpdateUserPlan, Foreground),
     (UpdateWorktree, Foreground),
     (UpdateWorktreeSettings, Foreground),
     (UsersResponse, Foreground),
@@ -392,10 +399,11 @@ messages!(
     (AdvertiseContexts, Foreground),
     (OpenContext, Foreground),
     (OpenContextResponse, Foreground),
+    (CreateContext, Foreground),
+    (CreateContextResponse, Foreground),
     (UpdateContext, Foreground),
     (SynchronizeContexts, Foreground),
     (SynchronizeContextsResponse, Foreground),
-    // Remote development
     (AddWorktree, Foreground),
     (AddWorktreeResponse, Foreground),
 );
@@ -409,9 +417,7 @@ request_messages!(
     (Call, Ack),
     (CancelCall, Ack),
     (CopyProjectEntry, ProjectEntryResponse),
-    (CompleteWithLanguageModel, LanguageModelResponse),
     (ComputeEmbeddings, ComputeEmbeddingsResponse),
-    (CountTokensWithLanguageModel, CountTokensResponse),
     (CreateChannel, CreateChannelResponse),
     (CreateProjectEntry, ProjectEntryResponse),
     (CreateRoom, CreateRoomResponse),
@@ -464,6 +470,12 @@ request_messages!(
     (PerformRename, PerformRenameResponse),
     (Ping, Ack),
     (PrepareRename, PrepareRenameResponse),
+    (CompleteWithLanguageModel, CompleteWithLanguageModelResponse),
+    (
+        StreamCompleteWithLanguageModel,
+        StreamCompleteWithLanguageModelResponse
+    ),
+    (CountLanguageModelTokens, CountLanguageModelTokensResponse),
     (RefreshInlayHints, Ack),
     (RejoinChannelBuffers, RejoinChannelBuffersResponse),
     (RejoinRoom, RejoinRoomResponse),
@@ -514,8 +526,8 @@ request_messages!(
     (RenameDevServer, Ack),
     (RestartLanguageServers, Ack),
     (OpenContext, OpenContextResponse),
+    (CreateContext, CreateContextResponse),
     (SynchronizeContexts, SynchronizeContextsResponse),
-    // Remote development
     (AddWorktree, AddWorktreeResponse),
 );
 
@@ -581,6 +593,7 @@ entity_messages!(
     LspExtExpandMacro,
     AdvertiseContexts,
     OpenContext,
+    CreateContext,
     UpdateContext,
     SynchronizeContexts,
 );

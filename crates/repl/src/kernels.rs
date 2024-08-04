@@ -13,11 +13,13 @@ use runtimelib::{
 };
 use smol::{net::TcpListener, process::Command};
 use std::{
+    env,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::Arc,
 };
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct KernelSpecification {
@@ -221,15 +223,23 @@ impl RunningKernel {
 
             let process = cmd
                 .current_dir(&working_directory)
-                // .stdout(Stdio::null())
-                // .stderr(Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
                 .kill_on_drop(true)
                 .spawn()
                 .context("failed to start the kernel process")?;
 
-            let mut iopub_socket = connection_info.create_client_iopub_connection("").await?;
-            let mut shell_socket = connection_info.create_client_shell_connection().await?;
-            let mut control_socket = connection_info.create_client_control_connection().await?;
+            let session_id = Uuid::new_v4().to_string();
+
+            let mut iopub_socket = connection_info
+                .create_client_iopub_connection("", &session_id)
+                .await?;
+            let mut shell_socket = connection_info
+                .create_client_shell_connection(&session_id)
+                .await?;
+            let mut control_socket = connection_info
+                .create_client_control_connection(&session_id)
+                .await?;
 
             let (mut iopub, iosub) = futures::channel::mpsc::channel(100);
 
@@ -374,7 +384,33 @@ async fn read_kernels_dir(path: PathBuf, fs: &dyn Fs) -> Result<Vec<KernelSpecif
 }
 
 pub async fn kernel_specifications(fs: Arc<dyn Fs>) -> Result<Vec<KernelSpecification>> {
-    let data_dirs = dirs::data_dirs();
+    let mut data_dirs = dirs::data_dirs();
+
+    // Pick up any kernels from conda or conda environment
+    if let Ok(conda_prefix) = env::var("CONDA_PREFIX") {
+        let conda_prefix = PathBuf::from(conda_prefix);
+        let conda_data_dir = conda_prefix.join("share").join("jupyter");
+        data_dirs.push(conda_data_dir);
+    }
+
+    // Search for kernels inside the base python environment
+    let command = Command::new("python")
+        .arg("-c")
+        .arg("import sys; print(sys.prefix)")
+        .output()
+        .await;
+
+    if let Ok(command) = command {
+        if command.status.success() {
+            let python_prefix = String::from_utf8(command.stdout);
+            if let Ok(python_prefix) = python_prefix {
+                let python_prefix = PathBuf::from(python_prefix.trim());
+                let python_data_dir = python_prefix.join("share").join("jupyter");
+                data_dirs.push(python_data_dir);
+            }
+        }
+    }
+
     let kernel_dirs = data_dirs
         .iter()
         .map(|dir| dir.join("kernels"))

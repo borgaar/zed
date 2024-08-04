@@ -33,7 +33,7 @@ use gpui::{
     actions, AppContext, AsyncAppContext, Context, EventEmitter, Global, Model, ModelContext, Task,
     WeakModel,
 };
-use http::{AsyncBody, HttpClient, HttpClientWithUrl};
+use http_client::{AsyncBody, HttpClient, HttpClientWithUrl};
 use indexed_docs::{IndexedDocsRegistry, ProviderId};
 use language::{
     LanguageConfig, LanguageMatcher, LanguageQueries, LanguageRegistry, QUERY_FILENAME_PREFIXES,
@@ -244,7 +244,9 @@ impl ExtensionStore {
             installed_dir,
             index_path,
             builder: Arc::new(ExtensionBuilder::new(
-                http::client(http_client.proxy().cloned()),
+                // Construct a real HTTP client for the extension builder, as we
+                // don't want to use a fake one in the tests.
+                ::http_client::client(None, http_client.proxy().cloned()),
                 build_dir,
             )),
             outstanding_operations: Default::default(),
